@@ -43,7 +43,6 @@ use crate::io::ErrorKind;
 //.space 0xD0
 //");
 
-pub mod alloc;
 pub mod args;
 pub mod env;
 pub mod fs;
