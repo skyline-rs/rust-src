@@ -32,7 +32,7 @@ impl AllocatedCondvar {
                 target_vendor = "apple",
             ))] {
                 // `pthread_condattr_setclock` is unfortunately not supported on these platforms.
-            } else if #[cfg(any(target_os = "espidf", target_os = "horizon", target_os = "teeos"))] {
+            } else if #[cfg(any(target_os = "espidf", target_os = "horizon", target_os = "teeos", target_os = "switch"))] {
                 // NOTE: ESP-IDF's PTHREAD_COND_INITIALIZER support is not released yet
                 // So on that platform, init() should always be called
                 // Moreover, that platform does not have pthread_condattr_setclock support,
