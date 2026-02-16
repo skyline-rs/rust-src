@@ -1976,7 +1976,7 @@ crate::target_spec_enum! {
         HelenOs = "helenos",
         Hermit = "hermit",
         Horizon = "horizon",
-        HorizonSkyline = "skyline",
+        HorizonSkyline = "switch",
         Hurd = "hurd",
         Illumos = "illumos",
         IOs = "ios",

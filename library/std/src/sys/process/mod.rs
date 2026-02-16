@@ -15,7 +15,7 @@ cfg_select! {
         mod motor;
         use motor as imp;
     }
-    // target_os = "skyline" => {
+    // target_os = "switch" => {
     //     mod switch;
     //     use switch as imp;
     // }

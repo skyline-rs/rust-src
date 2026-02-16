@@ -60,7 +60,7 @@ cfg_select! {
         mod zkvm;
         pub use self::zkvm::*;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod switch;
         pub use self::switch::*;
     }

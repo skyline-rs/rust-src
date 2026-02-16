@@ -53,7 +53,7 @@ cfg_select! {
         mod zkvm;
         pub use zkvm::*;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod unsupported;
         pub use unsupported::*;
     }

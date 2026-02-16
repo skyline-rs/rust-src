@@ -102,7 +102,7 @@ cfg_select! {
         mod zkvm;
         pub use zkvm::fill_bytes;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod switch;
         pub use switch::fill_bytes;
     }

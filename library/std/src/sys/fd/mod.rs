@@ -15,7 +15,7 @@ cfg_select! {
         mod motor;
         pub use motor::*;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod switch;
         pub use switch::*;
     }

@@ -45,7 +45,7 @@ cfg_select! {
         mod vexos;
         use vexos as imp;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod switch;
         use switch as imp;
     }

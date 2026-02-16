@@ -44,7 +44,7 @@ cfg_select! {
         mod xous;
         use xous as imp;
     }
-    target_os = "skyline" => {
+    target_os = "switch" => {
         mod switch;
         use switch as imp;
     }
