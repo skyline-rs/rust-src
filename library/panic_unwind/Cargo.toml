@@ -17,7 +17,7 @@ core = { path = "../rustc-std-workspace-core", package = "rustc-std-workspace-co
 unwind = { path = "../unwind" }
 
 [target.'cfg(not(all(windows, target_env = "msvc")))'.dependencies]
-libc = { version = "0.2", default-features = false }
+libc = { git = "https://github.com/jam1garner/libc", branch="fix-switch-target-test", default-features = false }
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

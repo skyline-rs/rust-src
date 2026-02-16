@@ -11,4 +11,4 @@ std = { path = "../std", public = true }
 core = { path = "../core", public = true }
 
 [target.'cfg(not(all(windows, target_env = "msvc")))'.dependencies]
-libc = { version = "0.2.150", default-features = false }
+libc = { git = "https://github.com/jam1garner/libc", branch="fix-switch-target-test", default-features = false }
