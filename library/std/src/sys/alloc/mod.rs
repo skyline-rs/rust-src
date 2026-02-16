@@ -107,4 +107,7 @@ cfg_select! {
     target_os = "zkvm" => {
         mod zkvm;
     }
+    target_os = "skyline" => {
+        mod switch;
+    }
 }

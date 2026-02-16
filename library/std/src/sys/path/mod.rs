@@ -21,6 +21,10 @@ cfg_select! {
         mod windows_prefix;
         pub use cygwin::*;
     }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::*;
+    }
     _ => {
         mod unix;
         pub use unix::*;

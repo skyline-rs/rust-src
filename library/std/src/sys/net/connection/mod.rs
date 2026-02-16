@@ -5,6 +5,7 @@ cfg_select! {
         target_os = "hermit",
         all(target_os = "wasi", any(target_env = "p2", target_env = "p3")),
         target_os = "solid_asp3",
+        target_os = "skyline"
     ) => {
         mod socket;
         pub use socket::*;
@@ -28,6 +29,10 @@ cfg_select! {
     target_os = "uefi" => {
         mod uefi;
         pub use uefi::*;
+    }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::*;
     }
     _ => {
         mod unsupported;

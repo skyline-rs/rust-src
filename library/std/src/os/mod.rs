@@ -183,6 +183,8 @@ pub mod vita;
 pub mod vxworks;
 #[cfg(target_os = "xous")]
 pub mod xous;
+#[cfg(target_os = "skyline")]
+pub mod switch;
 
 #[cfg(any(
     unix,

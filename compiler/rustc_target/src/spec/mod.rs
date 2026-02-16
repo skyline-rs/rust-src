@@ -1768,6 +1768,8 @@ supported_targets! {
     ("armv6k-nintendo-3ds", armv6k_nintendo_3ds),
 
     ("aarch64-nintendo-switch-freestanding", aarch64_nintendo_switch_freestanding),
+    ("aarch64-skyline-switch", aarch64_skyline_switch),
+
 
     ("armv7-sony-vita-newlibeabihf", armv7_sony_vita_newlibeabihf),
 
@@ -1974,6 +1976,7 @@ crate::target_spec_enum! {
         HelenOs = "helenos",
         Hermit = "hermit",
         Horizon = "horizon",
+        HorizonSkyline = "skyline",
         Hurd = "hurd",
         Illumos = "illumos",
         IOs = "ios",

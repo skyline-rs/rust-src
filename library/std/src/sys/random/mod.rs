@@ -102,6 +102,10 @@ cfg_select! {
         mod zkvm;
         pub use zkvm::fill_bytes;
     }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::fill_bytes;
+    }
     any(
         all(target_family = "wasm", target_os = "unknown"),
         target_os = "xous",

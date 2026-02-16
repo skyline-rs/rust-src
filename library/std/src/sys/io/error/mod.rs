@@ -47,6 +47,10 @@ cfg_select! {
         mod generic;
         pub use generic::*;
     }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::*;
+    }
 }
 
 pub type RawOsError = cfg_select! {

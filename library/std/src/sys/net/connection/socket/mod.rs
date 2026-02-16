@@ -30,6 +30,10 @@ cfg_select! {
         mod windows;
         pub use windows::*;
     }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::*;
+    }
     _ => {}
 }
 

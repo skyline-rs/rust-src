@@ -20,6 +20,7 @@ cfg_select! {
     any(
         target_family = "unix",
         target_os = "teeos",
+        target_os = "skyline"
     ) => {
         mod pthread;
         pub use pthread::Mutex;

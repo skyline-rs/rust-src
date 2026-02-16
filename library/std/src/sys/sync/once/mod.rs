@@ -29,6 +29,7 @@ cfg_select! {
         all(target_vendor = "fortanix", target_env = "sgx"),
         target_os = "solid_asp3",
         target_os = "xous",
+        target_os = "skyline"
     ) => {
         mod queue;
         pub use queue::{Once, OnceState};

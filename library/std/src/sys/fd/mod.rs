@@ -15,6 +15,10 @@ cfg_select! {
         mod motor;
         pub use motor::*;
     }
+    target_os = "skyline" => {
+        mod switch;
+        pub use switch::*;
+    }
     all(target_vendor = "fortanix", target_env = "sgx") => {
         mod sgx;
         pub use sgx::*;
