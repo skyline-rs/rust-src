@@ -38,5 +38,6 @@ pub(crate) fn absolute(path: &Path) -> io::Result<PathBuf> {
 }
 
 pub(crate) fn is_absolute(path: &Path) -> bool {
-    path.has_root()
+    let temp = path.as_os_str().as_encoded_bytes();
+    temp.contains(&b':')
 }
