@@ -163,8 +163,9 @@ dependencies = [
 
 [[package]]
 name = "libc-nnsdk"
-version = "0.4.0"
-source = "git+https://github.com/Raytwo/libc-nnsdk?branch=core#7059d67d959bae635d96160c505e167eb3917b29"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1256a11d163c7288d94909f8120ede53294d8c233df314b0e4f01cf0269707da"
 dependencies = [
  "rustc-std-workspace-core",
 ]
@@ -201,8 +202,9 @@ dependencies = [
 
 [[package]]
 name = "nnsdk"
-version = "0.5.0"
-source = "git+https://github.com/Raytwo/nnsdk-rs?branch=libc-fix#6c503663822e5235fc2c0e842a545641b97beeb5"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b93c8d8abfc4d7400395a4460137e9b6c017cf6ace2f46bc80ce021a84f84ea9"
 dependencies = [
  "libc-nnsdk",
  "rustc-std-workspace-alloc",

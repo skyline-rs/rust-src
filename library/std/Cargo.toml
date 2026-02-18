@@ -103,8 +103,8 @@ vex-sdk = { version = "0.27.0", features = [
 ], default-features = false }
 
 [target.'cfg(target_os = "switch")'.dependencies]
-libc-nnsdk = { git = "https://github.com/Raytwo/libc-nnsdk", branch="core", features = ['rustc-dep-of-std'] }
-nnsdk = { git = "https://github.com/Raytwo/nnsdk-rs", branch="libc-fix", features = ['rustc-dep-of-std'] }
+libc-nnsdk = { version = "0.5.0", features = ['rustc-dep-of-std'] }
+nnsdk = { version = "0.6.0", features = ['rustc-dep-of-std'] }
 
 [features]
 backtrace = [
