@@ -591,8 +591,10 @@ impl DirBuilder {
         let path = cstr(path)?;
 
         unsafe {
-            r_try!(nnsdk::fs::CreateDirectory(path.as_ptr() as *const _))
+            nnsdk::fs::CreateDirectory(path.as_ptr() as *const _);
         }
+
+        Ok(())
     }
 }
 
