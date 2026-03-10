@@ -73,30 +73,7 @@ impl io::Write for Stdout {
 
         Ok(buf.len())
     }
-
-    #[inline]
-    fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
-        let total_len = bufs.iter().map(|b| b.len()).sum();
-        Ok(total_len)
-    }
-
-    #[inline]
-    fn is_write_vectored(&self) -> bool {
-        true
-    }
-
-    #[inline]
-    fn write_all(&mut self, _buf: &[u8]) -> io::Result<()> {
-        Ok(())
-    }
-
-    #[inline]
-    fn write_all_vectored(&mut self, _bufs: &mut [IoSlice<'_>]) -> io::Result<()> {
-        Ok(())
-    }
-
-    // Keep the default write_fmt so the `fmt::Arguments` are still evaluated.
-
+    
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
