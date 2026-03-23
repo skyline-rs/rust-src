@@ -123,7 +123,7 @@ pub fn sleep(dur: Duration) {
 }
 
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
-    unsupported()
+    Ok(unsafe { NonZero::new_unchecked(3) })
 }
 
 impl Drop for Thread {
