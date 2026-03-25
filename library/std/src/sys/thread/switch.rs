@@ -8,6 +8,7 @@ use crate::time::Duration;
 use crate::num::NonZeroUsize;
 use crate::sys::unsupported;
 use crate::thread::ThreadInit;
+use crate::num::NonZero;
 
 
 use nnsdk::{os::SleepThread, TimeSpan};
