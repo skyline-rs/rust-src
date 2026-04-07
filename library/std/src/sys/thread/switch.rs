@@ -2,16 +2,21 @@ use crate::cmp;
 use crate::ffi::CStr;
 use crate::io;
 use crate::mem;
+use crate::num::NonZero;
+use crate::num::NonZeroUsize;
 use crate::ptr;
 use crate::sys::os;
-use crate::time::Duration;
-use crate::num::NonZeroUsize;
 use crate::sys::unsupported;
 use crate::thread::ThreadInit;
-use crate::num::NonZero;
-
+use crate::time::Duration;
 
 use nnsdk::{os::SleepThread, TimeSpan};
+
+// TODO: Move to nnsdk?
+unsafe extern "C" {
+    #[link_name = "_ZN2nn2os17SetThreadCoreMaskEPNS0_10ThreadTypeEim"]
+    fn nn_os_SetThreadCoreMask(thread: *mut nnsdk::os::ThreadType, ideal_core: i32, mask: u64);
+}
 
 #[cfg(not(target_os = "l4re"))]
 pub const DEFAULT_MIN_STACK_SIZE: usize = 2 * 1024 * 1024;
@@ -27,13 +32,6 @@ pub struct Thread {
 unsafe impl Send for Thread {}
 unsafe impl Sync for Thread {}
 
-unsafe fn pthread_attr_setstacksize(
-    attr: *mut libc::pthread_attr_t,
-    stack_size: libc::size_t,
-) -> libc::c_int {
-    libc::pthread_attr_setstacksize(attr, stack_size)
-}
-
 impl Thread {
     // unsafe: see thread::Builder::spawn_unchecked for safety requirements
     pub unsafe fn new(stack: usize, init: Box<ThreadInit>) -> io::Result<Thread> {
@@ -44,7 +42,7 @@ impl Thread {
 
         let stack_size = cmp::max(stack, min_stack_size(&attr));
 
-        match pthread_attr_setstacksize(&mut attr, stack_size) {
+        match libc::pthread_attr_setstacksize(&mut attr, stack_size) {
             0 => {}
             n => {
                 assert_eq!(n, libc::EINVAL);
@@ -95,7 +93,7 @@ impl Thread {
 }
 
 pub fn current_os_id() -> Option<u64> {
-    None
+    Some(unsafe { libc::pthread_self() } as u64)
 }
 
 pub fn yield_now() {
@@ -124,7 +122,17 @@ pub fn sleep(dur: Duration) {
 }
 
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
-    Ok(unsafe { NonZero::new_unchecked(3) })
+    // Not sure this is better than hardcoding the cores, but with the Switch 2 being a thing nwo maybe it's better to query the OS.
+    let mask = unsafe { nnsdk::os::GetThreadAvailableCoreMask() };
+    NonZero::new(mask.count_ones() as usize)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "no usable cores"))
+}
+
+pub fn pin_to_core(core_id: i32) {
+    debug_assert!(core_id >= 0, "core_id must be non-negative");
+    unsafe {
+        nn_os_SetThreadCoreMask(nnsdk::os::GetCurrentThread(), core_id, 1u64 << core_id);
+    }
 }
 
 impl Drop for Thread {
@@ -147,9 +155,5 @@ pub mod guard {
 }
 
 fn min_stack_size(_: *const libc::pthread_attr_t) -> usize {
-    0x1000 // just a guess
-}
-
-pub fn available_concurrency() -> io::Result<NonZeroUsize> {
-    unsupported()
+    os::page_size()
 }

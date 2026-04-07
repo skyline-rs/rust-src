@@ -117,7 +117,7 @@ cfg_select! {
     }
     target_os = "switch" => {
         mod switch;
-        pub use switch::{Thread, available_parallelism, current_os_id, set_name, sleep, yield_now, DEFAULT_MIN_STACK_SIZE};
+        pub use switch::{Thread, available_parallelism, current_os_id, pin_to_core, set_name, sleep, yield_now, DEFAULT_MIN_STACK_SIZE};
     }
     _ => {
         mod unsupported;

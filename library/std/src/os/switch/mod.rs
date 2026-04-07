@@ -3,6 +3,8 @@
 
 pub mod ffi;
 pub mod io;
+#[stable(feature = "switch_thread_ext", since = "1.0.0")]
+pub mod thread;
 
 /// A prelude for conveniently writing platform-specific code.
 ///
@@ -15,4 +17,7 @@ pub mod prelude {
     #[doc(no_inline)]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub use super::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+    #[doc(no_inline)]
+    #[stable(feature = "switch_thread_ext", since = "1.0.0")]
+    pub use super::thread::BuilderExt;
 }
