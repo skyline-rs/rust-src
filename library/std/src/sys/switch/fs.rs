@@ -24,6 +24,7 @@ macro_rules! r_try {
             match rc {
                 0 => Ok(()),
                 0x202 => Err(io::Error::new(io::ErrorKind::NotFound, "the file was not found")),
+                0x402 => Err(io::Error::new(io::ErrorKind::AlreadyExists, "the path already exists")),
                 rc => Err(io::Error::from_raw_os_error(rc as _))
             }
         }
