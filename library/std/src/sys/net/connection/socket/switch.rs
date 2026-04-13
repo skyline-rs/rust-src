@@ -12,11 +12,9 @@ use crate::sys::pal::IsMinusOne;
 use super::{getsockopt, setsockopt, socket_addr_from_c, socket_addr_to_c};
 use crate::sys::{AsInner, FromInner, IntoInner};
 
-
 use crate::time::{Duration, Instant};
 
 use crate::sys::unsupported;
-
 
 use nnsdk as nn;
 
@@ -30,17 +28,59 @@ pub extern crate libc as netc;
 #[allow(non_camel_case_types)]
 pub type wrlen_t = size_t;
 
+#[repr(C)]
+struct NnPollFd {
+    fd: c_int,
+    events: i16,
+    revents: i16,
+}
+
+const NN_POLLIN: i16 = 0x01;
+const NN_POLLOUT: i16 = 0x04;
+
+extern "C" {
+    #[link_name = "_ZN2nn6socket5CloseEi"]
+    fn nn_close(fd: c_int) -> c_int;
+
+    #[link_name = "_ZN2nn6socket8ShutdownEii"]
+    fn nn_shutdown(fd: c_int, how: c_int) -> c_int;
+
+    #[link_name = "_ZN2nn6socket4PollEPNS0_6PollFdEmi"]
+    fn nn_poll(fds: *mut NnPollFd, nfds: u64, timeout: c_int) -> c_int;
+
+    #[link_name = "_ZN2nn6socket4RecvEiPvmi"]
+    fn nn_recv(fd: c_int, buf: *mut c_void, len: u64, flags: c_int) -> i64;
+
+    #[link_name = "_ZN2nn6socket8RecvFromEiPvmiP8sockaddrPj"]
+    fn nn_recvfrom(fd: c_int, buf: *mut c_void, len: u64, flags: c_int,
+                   addr: *mut sockaddr, addrlen: *mut socklen_t) -> i64;
+
+    #[link_name = "_ZN2nn6socket6SendToEiPKvmiPK8sockaddrj"]
+    fn nn_sendto(fd: c_int, buf: *const c_void, len: u64, flags: c_int,
+                 addr: *const sockaddr, addrlen: socklen_t) -> i64;
+
+    #[link_name = "_ZN2nn6socket10GetSockOptEiiiPvPj"]
+    fn nn_getsockopt(fd: c_int, level: c_int, opt: c_int,
+                     val: *mut c_void, len: *mut socklen_t) -> c_int;
+
+    #[link_name = "_ZN2nn6socket11GetSockNameEiP8sockaddrPj"]
+    fn nn_getsockname(fd: c_int, addr: *mut sockaddr, addrlen: *mut socklen_t) -> c_int;
+
+    #[link_name = "_ZN2nn6socket5FcntlEiiz"]
+    fn nn_fcntl(fd: c_int, cmd: c_int, ...) -> c_int;
+}
+
 pub struct Socket(FileDesc);
 
 pub fn init() {
-    unsafe {
+    static NIFM_INIT: crate::sync::Once = crate::sync::Once::new();
+    NIFM_INIT.call_once(|| unsafe {
         nn::nifm::Initialize();
         nn::nifm::SubmitNetworkRequest();
-
-        while (nn::nifm::IsNetworkRequestOnHold()) {
-            nn::os::SleepThread(nnsdk::TimeSpan::nano(1000000000));
+        while nn::nifm::IsNetworkRequestOnHold() {
+            nn::os::SleepThread(nnsdk::TimeSpan::nano(10_000_000));
         }
-    }
+    });
 }
 
 pub fn cvt_gai(err: c_int) -> io::Result<()> {
@@ -48,21 +88,16 @@ pub fn cvt_gai(err: c_int) -> io::Result<()> {
         return Ok(());
     }
 
-    // We may need to trigger a glibc workaround. See on_resolver_failure() for details.
     on_resolver_failure();
 
     if err == EAI_SYSTEM {
         return Err(io::Error::last_os_error());
     } else if err == 7 { // EAI_NODATA
-        // This doesn't make much sense, considering they should've used EAI_SYSTEM and provided a ENETDOWN error.
-        // No point in trying to connect the socket if the network is down
         return if unsafe { !nn::nifm::IsNetworkAvailable() } {
-            // return Err(io::Error::new(io::ErrorKind::NetworkDown, "failed to connect to the network, consider removing airplane mode or configuring your network settings"));
             Err(io::Error::from(io::ErrorKind::NetworkDown))
         } else {
             Err(io::Error::new(io::ErrorKind::Other, "an unknown networking error has occurred"))
         }
-
     }
 
     let detail = unsafe {
@@ -77,31 +112,23 @@ pub fn cvt_gai(err: c_int) -> io::Result<()> {
 impl Socket {
     pub fn new(fam: c_int, ty: c_int) -> io::Result<Socket> {
         unsafe {
-            let fd = cvt(libc::socket(fam, ty, 0))?;
+            let fd = cvt(nn::socket::Socket(fam, ty, 0))?;
             let fd = FileDesc::new(fd);
             fd.set_cloexec()?;
             let socket = Socket(fd);
-
             Ok(socket)
         }
     }
 
-    pub fn new_pair(fam: c_int, ty: c_int) -> io::Result<(Socket, Socket)> {
-        let mut fds = [0, 0];
-
-        cvt(libc::socketpair(fam, ty, 0, fds.as_mut_ptr()))?;
-        let a = FileDesc::new(fds[0]);
-        let b = FileDesc::new(fds[1]);
-        a.set_cloexec()?;
-        b.set_cloexec()?;
-        Ok((Socket(a), Socket(b)))
+    pub fn new_pair(_fam: c_int, _ty: c_int) -> io::Result<(Socket, Socket)> {
+        Err(io::Error::new(io::ErrorKind::Unsupported, "socketpair not supported on Switch"))
     }
 
     pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         let (addr, len) = socket_addr_to_c(addr);
         loop {
-            let result = unsafe { libc::connect(self.as_raw_fd(), addr.as_ptr(), len) };
-            if result.is_minus_one() {
+            let result = unsafe { nn::socket::Connect(self.0.raw(), addr.as_ptr() as *const _, len as u32) };
+            if (result as i32).is_minus_one() {
                 let err = crate::sys::io::errno();
                 match err {
                     libc::EINTR => continue,
@@ -117,7 +144,7 @@ impl Socket {
         self.set_nonblocking(true)?;
         let r = unsafe {
             let (addr, len) = socket_addr_to_c(addr);
-            cvt(libc::connect(self.0.raw(), addr.as_ptr(), len))
+            cvt(nn::socket::Connect(self.0.raw(), addr.as_ptr() as *const _, len as u32) as i32)
         };
         self.set_nonblocking(false)?;
 
@@ -128,7 +155,7 @@ impl Socket {
             Err(e) => return Err(e),
         }
 
-        let mut pollfd = libc::pollfd { fd: self.0.raw(), events: libc::POLLOUT, revents: 0 };
+        let mut pollfd = NnPollFd { fd: self.0.raw(), events: NN_POLLOUT, revents: 0 };
 
         if timeout.as_secs() == 0 && timeout.subsec_nanos() == 0 {
             return Err(io::Error::new(
@@ -145,18 +172,15 @@ impl Socket {
                 return Err(io::Error::new(io::ErrorKind::TimedOut, "connection timed out"));
             }
 
-            let timeout = timeout - elapsed;
-            let mut timeout = timeout
+            let remaining = timeout - elapsed;
+            let mut ms = remaining
                 .as_secs()
                 .saturating_mul(1_000)
-                .saturating_add(timeout.subsec_nanos() as u64 / 1_000_000);
-            if timeout == 0 {
-                timeout = 1;
-            }
+                .saturating_add(remaining.subsec_nanos() as u64 / 1_000_000);
+            if ms == 0 { ms = 1; }
+            let ms = cmp::min(ms, c_int::MAX as u64) as c_int;
 
-            let timeout = cmp::min(timeout, c_int::MAX as u64) as c_int;
-
-            match unsafe { libc::poll(&mut pollfd, 1, timeout) } {
+            match unsafe { nn_poll(&mut pollfd, 1, ms) } {
                 -1 => {
                     let err = io::Error::last_os_error();
                     if err.kind() != io::ErrorKind::Interrupted {
@@ -164,24 +188,13 @@ impl Socket {
                     }
                 }
                 0 => {}
-                _ => {
-                    // linux returns POLLOUT|POLLERR|POLLHUP for refused connections (!), so look
-                    // for POLLHUP rather than read readiness
-                    // if pollfd.revents & libc::POLLHUP != 0 {
-                    //     let e = self.take_error()?.unwrap_or_else(|| {
-                    //         io::Error::new(io::ErrorKind::Other, "no error set after POLLHUP")
-                    //     });
-                    //     return Err(e);
-                    // }
-
-                    return Ok(());
-                }
+                _ => return Ok(()),
             }
         }
     }
 
     pub fn accept(&self, storage: *mut sockaddr, len: *mut socklen_t) -> io::Result<Socket> {
-        let fd = cvt_r(|| unsafe { libc::accept(self.0.raw(), storage, len) })?;
+        let fd = cvt_r(|| unsafe { nn::socket::Accept(self.0.raw(), storage as *mut _, len) as i32 })?;
         let fd = FileDesc::new(fd);
         fd.set_cloexec()?;
         Ok(Socket(fd))
@@ -193,11 +206,10 @@ impl Socket {
 
     fn recv_with_flags(&self, mut buf: BorrowedCursor<'_>, flags: c_int) -> io::Result<()> {
         let ret = cvt(unsafe {
-            libc::recv(self.0.raw(), buf.as_mut().as_mut_ptr() as *mut c_void, buf.capacity(), flags)
+            nn_recv(self.0.raw(), buf.as_mut().as_mut_ptr() as *mut c_void,
+                    buf.capacity() as u64, flags) as i32
         })?;
-        unsafe {
-            buf.advance(ret as usize);
-        }
+        unsafe { buf.advance(ret as usize); }
         Ok(())
     }
 
@@ -232,21 +244,21 @@ impl Socket {
         flags: c_int,
     ) -> io::Result<(usize, SocketAddr)> {
         let mut storage: libc::sockaddr_storage = unsafe { mem::zeroed() };
-        let mut addrlen = mem::size_of_val(&storage) as libc::socklen_t;
+        let mut addrlen = mem::size_of_val(&storage) as socklen_t;
 
         let n = cvt(unsafe {
-            libc::recvfrom(
+            nn_recvfrom(
                 self.0.raw(),
                 buf.as_mut_ptr() as *mut c_void,
-                buf.len(),
+                buf.len() as u64,
                 flags,
                 &mut storage as *mut _ as *mut _,
                 &mut addrlen,
-            )
+            ) as i32
         })?;
         Ok((
             n as usize,
-            unsafe { socket_addr_from_c(&storage, mem::size_of_val(&storage) as libc::socklen_t as usize)? },
+            unsafe { socket_addr_from_c(&storage, mem::size_of_val(&storage) as socklen_t as usize)? },
         ))
     }
 
@@ -259,7 +271,10 @@ impl Socket {
     }
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        self.0.write(buf)
+        let ret = cvt(unsafe {
+            nn::socket::Send(self.0.raw(), buf.as_ptr(), buf.len() as u64, 0) as i32
+        })?;
+        Ok(ret as usize)
     }
 
     pub fn write_vectored(&self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
@@ -271,7 +286,7 @@ impl Socket {
         self.0.is_write_vectored()
     }
 
-    pub fn set_timeout(&self, dur: Option<Duration>, kind: libc::c_int) -> io::Result<()> {
+    pub fn set_timeout(&self, dur: Option<Duration>, kind: c_int) -> io::Result<()> {
         let timeout = match dur {
             Some(dur) => {
                 if dur.as_secs() == 0 && dur.subsec_nanos() == 0 {
@@ -300,7 +315,7 @@ impl Socket {
         unsafe { setsockopt(self, libc::SOL_SOCKET, kind, timeout) }
     }
 
-    pub fn timeout(&self, kind: libc::c_int) -> io::Result<Option<Duration>> {
+    pub fn timeout(&self, kind: c_int) -> io::Result<Option<Duration>> {
         let raw: libc::timeval = unsafe { getsockopt(self, libc::SOL_SOCKET, kind)? };
         if raw.tv_sec == 0 && raw.tv_usec == 0 {
             Ok(None)
@@ -317,26 +332,11 @@ impl Socket {
             Shutdown::Read => libc::SHUT_RD,
             Shutdown::Both => libc::SHUT_RDWR,
         };
-        cvt(unsafe { libc::shutdown(self.0.raw(), how) })?;
+        cvt(unsafe { nn_shutdown(self.0.raw(), how) })?;
         Ok(())
     }
 
-    // pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
-    //     let linger = libc::linger {
-    //         l_onoff: linger.is_some() as libc::c_int,
-    //         l_linger: linger.unwrap_or_default().as_secs() as libc::c_int,
-    //     };
-
-    //     setsockopt(self, libc::SOL_SOCKET, libc::SO_LINGER, linger)
-    // }
-
-    // pub fn linger(&self) -> io::Result<Option<Duration>> {
-    //     let val: libc::linger = getsockopt(self, libc::SOL_SOCKET, SO_LINGER)?;
-
-    //     Ok((val.l_onoff != 0).then(|| Duration::from_secs(val.l_linger as u64)))
-    // }
-
-    pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
+    pub fn set_linger(&self, _linger: Option<Duration>) -> io::Result<()> {
         unsupported()
     }
 
@@ -355,16 +355,15 @@ impl Socket {
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         unsafe {
-            let previous = cvt(libc::fcntl(self.as_raw_fd(), libc::F_GETFL))?;
+            let previous = cvt(nn_fcntl(self.as_raw_fd(), libc::F_GETFL))?;
             let new = if nonblocking {
                 previous | libc::O_NONBLOCK
             } else {
                 previous & !libc::O_NONBLOCK
             };
             if new != previous {
-                cvt(libc::fcntl(self.as_raw_fd(), libc::F_SETFL, new))?;
+                cvt(nn_fcntl(self.as_raw_fd(), libc::F_SETFL, new))?;
             }
-
             Ok(())
         }
     }
@@ -374,7 +373,6 @@ impl Socket {
         if raw == 0 { Ok(None) } else { Ok(Some(io::Error::from_raw_os_error(raw as i32))) }
     }
 
-    // This is used by sys_common code to abstract over Windows and Unix.
     pub fn as_raw(&self) -> c_int {
         *self.as_inner()
     }
@@ -393,16 +391,12 @@ impl FromInner<c_int> for Socket {
 }
 
 impl IntoInner<c_int> for Socket {
-    fn into_inner(self) -> c_int {
-        self.0.into_raw()
+    fn into_inner(mut self) -> c_int {
+        let fd = self.0.raw();
+        self.0 = FileDesc::new(-1);
+        fd
     }
 }
-
-// impl AsFd for Socket {
-//     fn as_fd(&self) -> BorrowedFd<'_> {
-//         self.0.as_fd()
-//     }
-// }
 
 impl AsRawFd for Socket {
     fn as_raw_fd(&self) -> RawFd {
@@ -422,27 +416,19 @@ impl FromRawFd for Socket {
     }
 }
 
-// In versions of glibc prior to 2.26, there's a bug where the DNS resolver
-// will cache the contents of /etc/resolv.conf, so changes to that file on disk
-// can be ignored by a long-running program. That can break DNS lookups on e.g.
-// laptops where the network comes and goes. See
-// https://sourceware.org/bugzilla/show_bug.cgi?id=984. Note however that some
-// distros including Debian have patched glibc to fix this for a long time.
-//
-// A workaround for this bug is to call the res_init libc function, to clear
-// the cached configs. Unfortunately, while we believe glibc's implementation
-// of res_init is thread-safe, we know that other implementations are not
-// (https://github.com/rust-lang/rust/issues/43592). Code here in libstd could
-// try to synchronize its res_init calls with a Mutex, but that wouldn't
-// protect programs that call into libc in other ways. So instead of calling
-// res_init unconditionally, we call it only when we detect we're linking
-// against glibc version < 2.26. (That is, when we both know its needed and
-// believe it's thread-safe).
+impl Drop for Socket {
+    fn drop(&mut self) {
+        let fd = self.0.raw();
+        if fd >= 0 {
+            unsafe { nn_close(fd); }
+        }
+        self.0 = FileDesc::new(-1);
+    }
+}
+
 #[cfg(target_env = "gnu")]
 fn on_resolver_failure() {
     use crate::sys;
-
-    // If the version fails to parse, we treat it the same as "not glibc".
     if let Some(version) = sys::os::glibc_version() {
         if version < (2, 26) {
             unsafe { libc::res_init() };
