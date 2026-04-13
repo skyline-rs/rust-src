@@ -205,7 +205,10 @@ impl DirEntry {
     }
 
     pub fn metadata(&self) -> io::Result<FileAttr> {
-        stat(&self.path)
+        Ok(FileAttr {
+            size: AtomicU64::new(self.size),
+            file_type: self.file_type,
+        })
     }
 
     pub fn file_type(&self) -> io::Result<FileType> {
