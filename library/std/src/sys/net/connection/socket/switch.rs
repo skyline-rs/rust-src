@@ -38,7 +38,7 @@ struct NnPollFd {
 const NN_POLLIN: i16 = 0x01;
 const NN_POLLOUT: i16 = 0x04;
 
-extern "C" {
+unsafe extern "C" {
     #[link_name = "_ZN2nn6socket5CloseEi"]
     fn nn_close(fd: c_int) -> c_int;
 
